@@ -6,21 +6,35 @@ import pandas as pd
 import streamlit as st
 
 st.set_page_config(page_title='Radar de publicaciones',page_icon='📻',layout='wide')
-st.markdown('''<style>
+st.markdown("""<style>
 .stApp {background:#f3f6fb;color:#15243b}
-.block-container {padding-top:2rem;padding-bottom:3rem;max-width:1250px}
+.block-container {padding-top:1rem;padding-bottom:.5rem;max-width:1600px}
 h1,h2,h3 {letter-spacing:-.025em}
-[data-testid="stMetric"] {background:white;border:1px solid #dce5f0;border-radius:14px;padding:20px;min-height:135px}
-[data-testid="stMetricValue"] {font-size:2rem;color:#143b76}
-[data-testid="stMetricLabel"] {font-size:1rem;color:#526580}
-[data-testid="stForm"] {background:white;border:1px solid #dce5f0;border-radius:16px;padding:24px}
-.stButton>button,.stFormSubmitButton>button {border-radius:10px;min-height:46px}
-.banner {padding:24px;border-radius:16px;background:#112b50;color:white;margin:10px 0 24px}
-.banner h2 {color:white;margin:0 0 8px;font-size:1.6rem}
-.banner p {color:#dbeafe;margin:0;font-size:1rem}
-.badge {display:inline-block;background:#e8eff9;color:#234b80;border-radius:20px;padding:6px 12px;font-size:.9rem;margin-bottom:12px}
-.eyebrow {color:#607590;font-size:.9rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px}
-</style>''',unsafe_allow_html=True)
+[data-testid="stVerticalBlock"] {gap:.6rem}
+[data-testid="stMetric"] {background:white;border:1px solid #dce5f0;border-radius:12px;padding:16px;min-height:105px}
+[data-testid="stMetricValue"] {font-size:clamp(1.25rem,2.2vw,2rem);color:#143b76}
+[data-testid="stMetricLabel"] {font-size:.95rem;color:#526580}
+[data-testid="stForm"] {background:white;border:1px solid #dce5f0;border-radius:14px;padding:16px}
+[data-testid="stWidgetLabel"] p {font-size:.875rem;line-height:1.2}
+.stButton>button,.stFormSubmitButton>button {border-radius:9px;min-height:40px}
+.banner {padding:20px;border-radius:14px;background:#112b50;color:white;margin:0 0 12px}
+.banner.viral {background:#0b5148}
+.banner h2 {color:white;margin:0 0 8px;font-size:1.5rem}
+.banner p {color:#e2edf9;margin:0;font-size:.95rem;line-height:1.4}
+.header {margin-bottom:12px}
+.header h1 {font-size:1.8rem;margin:0 0 3px}
+.header p {font-size:.95rem;color:#607590;margin:0}
+@media (max-width:900px) {
+.block-container {padding-top:1rem;padding-left:1rem;padding-right:1rem}
+.header h1 {font-size:1.5rem}
+}
+@media (min-width:1100px) and (max-height:800px) {
+.block-container {padding-top:.6rem}
+[data-testid="stVerticalBlock"] {gap:.35rem}
+[data-testid="stForm"] {padding:12px}
+[data-testid="stForm"] [data-testid="stVerticalBlock"] {gap:.3rem}
+}
+</style>""",unsafe_allow_html=True)
 
 @st.cache_resource
 def cargar_modelos(ruta):
@@ -39,9 +53,7 @@ def preparar_entrada(valores,features):
             if f'{prefijo}_{sufijo}' in features:datos[f'{prefijo}_{sufijo}']=func(2*np.pi*datos['dia_semana']/7)
     return datos[features]
 
-st.markdown('<div class="eyebrow">Planificación editorial</div>',unsafe_allow_html=True)
-st.title('Radar de publicaciones')
-st.write('Evalúa una propuesta y estima su rendimiento a los 14 días.')
+st.markdown('<div class="header"><h1>Radar de publicaciones</h1><p>Planificación editorial · Estimaciones a 14 días</p></div>',unsafe_allow_html=True)
 
 ruta=Path(__file__).parent/'modelos.joblib'
 if not ruta.exists():
@@ -66,74 +78,79 @@ contenido={'contenido_grupo','contenido','personalidad_grupo','personalidad','ti
 grupos=[('Publicación',[c for c in entradas if c in primarias]),('Contenido',[c for c in entradas if c in contenido]),('Imagen y video',[c for c in entradas if c not in primarias|contenido])]
 valores={}
 
-with st.sidebar:
-    st.subheader('Cómo usarlo')
-    st.write('1. Completa las tres secciones.\n\n2. Pulsa **Evaluar publicación**.\n\n3. Revisa el potencial y las estimaciones.')
-    st.caption('Los valores iniciales corresponden a una publicación de ejemplo. Revísalos antes de evaluar tu propuesta.')
-    st.divider()
-    st.caption('Proyecto académico · Modelos entrenados con datos sintéticos. Las estimaciones no garantizan resultados reales.')
+izquierda,derecha=st.columns([1.55,1],gap='large')
 
-with st.form('publicacion'):
-    st.subheader('Características de la propuesta')
-    tabs=st.tabs([nombre for nombre,_ in grupos])
-    for tab,(_,campos) in zip(tabs,grupos):
-        with tab:
-            cols=st.columns(2)
-            for idx,c in enumerate(campos):
-                with cols[idx%2]:
-                    label=labels.get(c,c.replace('_',' ').capitalize())
-                    if c in opciones:
-                        cats=opciones[c];v=str(ejemplo.get(c,cats[0]))
-                        valores[c]=st.selectbox(label,cats,index=cats.index(v) if v in cats else 0,key='campo_'+c)
-                    else:
-                        v=ejemplo.get(c,0);v=0 if v is None or pd.isna(v) else float(v)
-                        if c=='dia_semana':
-                            valores[c]=st.selectbox(label,list(range(7)),index=int(np.clip(v,0,6)),format_func=lambda x:['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][x])
-                        elif c=='mes_numero':
-                            valores[c]=st.selectbox(label,list(range(1,13)),index=int(np.clip(v,1,12))-1,format_func=lambda x:['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][x-1])
-                        elif c=='hora':
-                            valores[c]=st.selectbox(label,list(range(24)),index=int(np.clip(v,0,23)),format_func=lambda x:f'{x:02d}:00')
-                        elif c in bundle.get('binarias',[]):
-                            valores[c]=int(st.checkbox(label,value=bool(v)))
-                        elif c in ['duracion','horas_desde_publicacion_anterior']:
-                            valores[c]=st.number_input(label,min_value=0.0,value=max(0.0,v),step=0.1,help='Usa la misma unidad del dataset con el que entrenaste.' if c=='duracion' else None)
+with izquierda:
+    with st.form('publicacion'):
+        st.markdown('**Características de la propuesta**')
+        tabs=st.tabs([nombre for nombre,_ in grupos])
+        for tab,(nombre_grupo,campos) in zip(tabs,grupos):
+            with tab:
+                ncols=3 if nombre_grupo=='Contenido' else 2
+                cols=st.columns(ncols)
+                for idx,c in enumerate(campos):
+                    with cols[idx%ncols]:
+                        label=labels.get(c,c.replace('_',' ').capitalize())
+                        if c in opciones:
+                            cats=opciones[c];v=str(ejemplo.get(c,cats[0]))
+                            valores[c]=st.selectbox(label,cats,index=cats.index(v) if v in cats else 0,key='campo_'+c)
                         else:
-                            valores[c]=st.number_input(label,min_value=0,value=max(0,int(v)),step=1)
-    st.caption('En Imagen, Carrusel y Texto la duración se considera 0 automáticamente.')
-    enviado=st.form_submit_button('Evaluar publicación',type='primary',use_container_width=True)
+                            v=ejemplo.get(c,0);v=0 if v is None or pd.isna(v) else float(v)
+                            if c=='dia_semana':
+                                valores[c]=st.selectbox(label,list(range(7)),index=int(np.clip(v,0,6)),format_func=lambda x:['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'][x])
+                            elif c=='mes_numero':
+                                valores[c]=st.selectbox(label,list(range(1,13)),index=int(np.clip(v,1,12))-1,format_func=lambda x:['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][x-1])
+                            elif c=='hora':
+                                valores[c]=st.selectbox(label,list(range(24)),index=int(np.clip(v,0,23)),format_func=lambda x:f'{x:02d}:00')
+                            elif c in bundle.get('binarias',[]):
+                                valores[c]=int(st.checkbox(label,value=bool(v)))
+                            elif c in ['duracion','horas_desde_publicacion_anterior']:
+                                valores[c]=st.number_input(label,min_value=0.0,value=max(0.0,v),step=0.1,help='Usa la misma unidad del dataset con el que entrenaste.' if c=='duracion' else None)
+                            else:
+                                valores[c]=st.number_input(label,min_value=0,value=max(0,int(v)),step=1)
+        st.caption('En Imagen, Carrusel y Texto la duración se considera 0 automáticamente.')
+        enviado=st.form_submit_button('Evaluar publicación',type='primary',use_container_width=True)
 
-if enviado:
-    try:
-        X=preparar_entrada(valores,features)
-        with st.spinner('Calculando estimaciones…'):
-            score=float(bundle['clasificador'].predict_proba(X)[0,1])
-            if not np.isfinite(score):raise ValueError('El clasificador devolvió un valor no válido.')
-            resultados={}
-            for objetivo,modelo in bundle['regresores'].items():
-                pred=float(modelo.predict(X)[0])
-                if not np.isfinite(pred):raise ValueError(f'Predicción no válida para {objetivo}.')
-                resultados[objetivo]=max(0,pred)
-        st.session_state['resultado']={'score':score,'predicciones':resultados,'valores':valores.copy()}
-    except Exception as exc:
-        st.session_state.pop('resultado',None)
-        st.error('No se pudo evaluar la publicación. Revisa las entradas y la compatibilidad de los modelos.')
-        with st.expander('Detalle del error'):st.code(str(exc))
+    if enviado:
+        try:
+            X=preparar_entrada(valores,features)
+            with st.spinner('Calculando estimaciones…'):
+                score=float(bundle['clasificador'].predict_proba(X)[0,1])
+                if not np.isfinite(score):raise ValueError('El clasificador devolvió un valor no válido.')
+                resultados={}
+                for objetivo,modelo in bundle['regresores'].items():
+                    pred=float(modelo.predict(X)[0])
+                    if not np.isfinite(pred):raise ValueError(f'Predicción no válida para {objetivo}.')
+                    resultados[objetivo]=max(0,pred)
+            st.session_state['resultado']={'score':score,'predicciones':resultados,'valores':valores.copy()}
+        except Exception as exc:
+            st.session_state.pop('resultado',None)
+            st.error('No se pudo evaluar la publicación. Revisa las entradas y la compatibilidad de los modelos.')
+            with st.expander('Detalle del error'):st.code(str(exc))
 
-if 'resultado' in st.session_state:
-    r=st.session_state['resultado'];viral=r['score']>=float(bundle['umbral']);v=r['valores']
-    titulo='Potencial viral' if viral else 'Rendimiento normal'
-    contexto=' · '.join(str(v.get(c,'')) for c in ['radio_nombre_corto','formato','contenido_grupo'] if v.get(c))
-    st.markdown(f'<div class="banner"><h2>{titulo}</h2><p>{html.escape(contexto)} · Estimación a 14 días</p></div>',unsafe_allow_html=True)
+with derecha:
+    st.markdown('**Resultado de la evaluación**')
+    r=st.session_state.get('resultado')
     nombres={'ingreso_meta':'Monetización','t_visualizaciones':'Visualizaciones','interacciones':'Interacciones','alcance_meta':'Alcance'}
-    cols=st.columns(4)
-    for idx,objetivo in enumerate(nombres):
-        pred=r['predicciones'].get(objetivo)
-        cols[idx].metric(nombres[objetivo],'—' if pred is None else (f'USD {pred:,.2f}' if objetivo=='ingreso_meta' else f'{pred:,.0f}'))
-    st.caption('Resultados de la última evaluación. Si modificas el formulario, pulsa Evaluar publicación nuevamente.')
-    with st.expander('Detalle de la estimación'):
-        st.write(f"Score de viralidad: **{r['score']:.3f}** · Umbral de decisión: **{float(bundle['umbral']):.3f}**")
-        st.write('El score no es una probabilidad calibrada. Las cantidades son estimaciones puntuales, no intervalos ni garantías.')
-    export={**v,**{f'pred_{k}':p for k,p in r['predicciones'].items()},'clasificacion':'Viral' if viral else 'Normal','score_viralidad':r['score']}
-    st.download_button('Descargar estimación',pd.DataFrame([export]).to_csv(index=False).encode('utf-8-sig'),file_name='estimacion_publicacion.csv',mime='text/csv')
-else:
-    st.markdown('<div class="banner"><h2>Evalúa tu próxima publicación</h2><p>Completa el formulario para ver el potencial de viralidad y las cuatro estimaciones.</p></div>',unsafe_allow_html=True)
+    if r:
+        viral=r['score']>=float(bundle['umbral']);v=r['valores']
+        titulo='Viral' if viral else 'Normal'
+        contexto=' · '.join(str(v.get(c,'')) for c in ['radio_nombre_corto','formato','contenido_grupo'] if v.get(c))
+        estilo='banner viral' if viral else 'banner'
+        st.markdown(f'<div class="{estilo}"><h2>{titulo}</h2><p>{html.escape(contexto)}</p></div>',unsafe_allow_html=True)
+        st.caption(f"Score: {r['score']:.3f} · Umbral: {float(bundle['umbral']):.3f}")
+    else:
+        st.markdown('<div class="banner"><h2>Por evaluar</h2><p>Completa las tres pestañas y pulsa Evaluar publicación.</p></div>',unsafe_allow_html=True)
+    st.markdown('**Rendimiento estimado a 14 días**')
+    objetivos=list(nombres)
+    for inicio in [0,2]:
+        cols=st.columns(2)
+        for col,objetivo in zip(cols,objetivos[inicio:inicio+2]):
+            pred=r['predicciones'].get(objetivo) if r else None
+            valor='—' if pred is None else (f'USD {pred:,.2f}' if objetivo=='ingreso_meta' else f'{pred:,.0f}')
+            col.metric(nombres[objetivo],valor)
+    if r:
+        st.caption('Última evaluación. Pulsa Evaluar publicación después de cambiar las entradas.')
+        export={**r['valores'],**{f'pred_{k}':p for k,p in r['predicciones'].items()},'clasificacion':'Viral' if viral else 'Normal','score_viralidad':r['score']}
+        st.download_button('Descargar estimación',pd.DataFrame([export]).to_csv(index=False).encode('utf-8-sig'),file_name='estimacion_publicacion.csv',mime='text/csv',use_container_width=True)
+    st.caption('Proyecto académico con datos sintéticos. Estimaciones puntuales; el score no es una probabilidad calibrada.')
